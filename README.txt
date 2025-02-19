@@ -5,4 +5,4 @@ TO RUN (Type in CMD):
     Start Backend Local Host -> uvicorn main:app --reload
     Start Frontend Local Host -> http-server
 
-Note: Make sure to have npm installed on your computer and set in PATH env
+Note: Make sure to have node.js installed on your computer and set in PATH env
