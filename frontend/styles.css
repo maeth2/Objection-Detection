@@ -1,0 +1,15 @@
+#container {
+    margin: 0px auto;
+    width: 500px;
+    height: 375px;
+    border: 10px #5d5d5dbc solid;
+}
+#videoElement {
+    width: 500px;
+    height: 375px;
+    background-color: #656565;
+}
+#output {
+    width: 100%;
+    height: 100%;
+}
