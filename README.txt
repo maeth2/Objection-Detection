@@ -1,1 +1,8 @@
-Start Local Host: uvicorn main:app --reload
+Objection Detection Web App based on YOLOV8 Detection by Ultralytics and FastAPI
+
+TO RUN (Type in CMD):
+    Install Packages -> pip install -r requirements.txt
+    Start Backend Local Host -> uvicorn main:app --reload
+    Start Frontend Local Host -> http-server
+
+Note: Make sure to have npm installed on your computer and set in PATH env
