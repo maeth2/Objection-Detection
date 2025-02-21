@@ -1,14 +1,22 @@
 document.body.onload = function(){init()}
-var canvas, ctx;
-var showLogs = false
+const SHOW_LOGS = false;
+const WEBSOCKET_ADDRESS = 'ws://127.0.0.1:8000/detect';
+const RETRY_INTERVAL = 10000;
+const FPS = 60, FPS_DETECT = 5;
+var websocketConnected = false;
+var inputCanvas, inputContext, outputCanvas, outputContext;
+var ws, wsRetry;
 
 function init(){
     console.log("INITIALIZING");
-    canvas = document.getElementById("output");
-    ctx = canvas.getContext("2d");
+    inputCanvas = document.getElementById("input");
+    inputContext = inputCanvas.getContext("2d");
+    outputCanvas = document.getElementById("output");
+    outputContext = outputCanvas.getContext("2d");
+    connectWS();
 }
 
-const webcam = document.getElementById("videoElement");
+const webcam = document.createElement('video');
 const contraints = {
     video : {
         facingMode : 'enviroment'
@@ -17,42 +25,70 @@ const contraints = {
 navigator.mediaDevices.getUserMedia(contraints).then((stream) => {
     webcam.srcObject = stream;
     webcam.play();
+    setInterval(() =>{
+        inputContext.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+        inputContext.drawImage(webcam, 0, 0, inputCanvas.width, inputCanvas.height);
+    }, 1000 / FPS);
 }).catch((error) =>{
     console.error(error);
 });
-webcam.addEventListener('click', httpRequest)
+webcam.addEventListener('click', httpRequest);
 
-var ws = new WebSocket("ws://127.0.0.1:8000/detect")
-ws.addEventListener('message', function (event){
-    if (showLogs){
-        console.log("Receiving Web Socket Message ->")
-        console.log(event.data);
-    }
-});
+function connectWS(){
+    console.log("ATTEMPTING CONNECTION TO: ", WEBSOCKET_ADDRESS);
+    ws = new WebSocket(WEBSOCKET_ADDRESS);
+    ws.addEventListener('message', (event) => {
+        outputContext.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        boxes = JSON.parse(event.data);
+        if(SHOW_LOGS) console.table(boxes);
+        boxes.forEach(box => {
+            var width = box['bounds'][2] - box['bounds'][0];
+            var height = box['bounds'][3] - box['bounds'][1];
+            outputContext.beginPath();
+            outputContext.strokeStyle = "red";
+            outputContext.lineWidth = 1;
+            outputContext.rect(box['bounds'][0], box['bounds'][1], width, height);
+            outputContext.stroke();
 
-setInterval(wsRequest, 1000);
-async function wsRequest(){
-    if(showLogs) console.log("Sending Web Socket Request...")
-    ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
-    console.log(webcam.width, webcam.height, canvas.width, canvas.height)
-    canvas.toBlob((blob) =>{ws.send(blob)}, 'image/png');
-    ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height);
+            outputContext.font = '5px Arial';
+            outputContext.textAlign ='left';
+            outputContext.textBaseline = 'bottom';
+            outputContext.fillStyle = "black";   
+            outputContext.fillText(box['label'], box['bounds'][0], box['bounds'][1]);
+        });
+    });
+    ws.addEventListener('open', (event) => {
+        websocketConnected = true;
+        clearInterval(wsRetry)
+        console.log("CONNECTED TO: ", WEBSOCKET_ADDRESS);
+    });
+    ws.addEventListener('close', (event) => {
+        websocketConnected = false
+        outputContext.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
+        wsRetry = setInterval(() => {
+            connectWS();
+        }, RETRY_INTERVAL);
+    });
 }
 
+setInterval(() => {
+    if(websocketConnected){
+        if(SHOW_LOGS) console.log("Sending Web Socket Request...");
+        inputCanvas.toBlob((blob) =>{ws.send(blob)}, 'image/png');
+    }
+}, 1000 / FPS_DETECT);
+
 async function httpRequest(){
-    ctx.drawImage(webcam, 0, 0, canvas.width, canvas.height)
-    const data = canvas.toDataURL("image/jpeg", 1.0)
+    inputContext.drawImage(webcam, 0, 0, inputCanvas.width, inputCanvas.height);
+    const data = inputCanvas.toDataURL("image/jpeg", 1.0);
     await fetch(URL="http://127.0.0.1:8000/test", {
         method : 'POST',
         body : data
     }).then((response) => {
         response.json().then((response_json) => {
-            if (showLogs) console.log(response_json)
-        })
-        // response.json().then((response_json) => response_json.forEach(box => {
-        //     console.log(box)
-        // }))
+            if (SHOW_LOGS) console.log(response_json);
+        });
     }).catch((error) => {
-        console.log(error)
+        console.log(error);
     });
 }

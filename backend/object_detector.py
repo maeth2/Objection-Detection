@@ -72,10 +72,6 @@ class BoundingBox():
         aoi = self.check_area_of_intersection(b)
         aou = self.check_area_of_union(b)
         return aoi / (aou - aoi)
-    
-    def render(self, frame):
-        cv2.putText(frame, text=self.label, org=(self.bounds[2], self.bounds[3]), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
-        cv2.rectangle(frame, pt1=(self.bounds[0], self.bounds[1]), pt2=(self.bounds[2], self.bounds[3]), color=self.color, thickness=self.thickness)
 
 class ObjectDetector():
     def click_event(self, event, x, y, flags, params):
@@ -85,12 +81,13 @@ class ObjectDetector():
     def __init__(self, model):
         print("INITIALIZING OBJECT DETECTOR")
         self.model = YOLO(model)
+        print("INITIALIZED.")
 
     def detect(self, frame, frame_width, frame_height):
         bounding_box = BoundingBox(frame_width / 2, frame_height / 2, 200, 200)
         result = self.model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False)[0]
 
-        bounds : list[list] = []
+        bounds : list[dict] = []
         for i in result.boxes:
             coords = i.xyxy[0]
             label = i.cls[0]
@@ -98,9 +95,9 @@ class ObjectDetector():
                 color=(255, 255, 255), 
                 thickness=1, 
                 label=helper.yolo_classes[int(label)]
-            ).set_bounds_from_coords((coords[0], coords[1]), (coords[2], coords[3]))
+            ).set_bounds_from_coords((coords[2], coords[3]), (coords[0], coords[1]))
             if b.check_intersection(bounding_box):
-                bounds.append([b.bounds, b.label])
+                bounds.append({"bounds" : b.bounds, "label" : b.label, "confidence"  : i.conf[0]})
 
         return bounds
 
