@@ -6,3 +6,6 @@ TO RUN (Type in CMD):
     Start Frontend Local Host -> http-server
 
 Note: Make sure to have node.js installed on your computer and set in PATH env
+
+To edit or install editional packages to the backend API:
+    Activate Virtual Enviorment -> ./venv/Scripts/activate
