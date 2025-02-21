@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import cv2
 import io
@@ -27,7 +28,7 @@ app.add_middleware(
 
 det : ObjectDetector = ObjectDetector("./models/yolov8n-oiv7.onnx")
 
-async def show_boxes(frame, boxes : list[dict]):
+async def show_boxes(frame, boxes : list[dict]) -> None:
     for i in boxes:
         bounds = i["bounds"]
         cv2.putText(frame, text=i["label"], org=(bounds[2], bounds[3]), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
@@ -37,23 +38,33 @@ async def show_boxes(frame, boxes : list[dict]):
     if cv2.waitKey(10) == 27 or not cv2.getWindowProperty('test', cv2.WND_PROP_VISIBLE):
                 cv2.destroyAllWindows()
 
-async def receive(websocket : WebSocket) -> cv2.typing.MatLike:
+async def receive(websocket : WebSocket, queue : asyncio.Queue) -> None:
     bytes = await websocket.receive_bytes()
     data = np.frombuffer(bytes, dtype=np.uint8)
     img = cv2.imdecode(data, cv2.IMREAD_COLOR)
-    return img
+    try:
+        queue.put_nowait(img)
+    except asyncio.QueueFull:
+         pass
+
+async def detectObjects(websocket : WebSocket, queue : asyncio.Queue) -> None:
+    while True:
+        img = await queue.get()
+        boxes = det.detect(img, img.shape[1], img.shape[0])
+        if DEBUG_MODE: 
+            await show_boxes(img, boxes)
+        await websocket.send_json(jsonable_encoder(boxes))
 
 @app.websocket("/detect")
-async def detect(websocket : WebSocket):
+async def detect(websocket : WebSocket) -> None:
     await websocket.accept()
+    queue : asyncio.Queue = asyncio.Queue(maxsize=10)
+    detect_task : asyncio.Task = asyncio.create_task(detectObjects(websocket=websocket, queue=queue)) 
     while True:
         try:
-            img = await receive(websocket)
-            boxes = det.detect(img, img.shape[1], img.shape[0])
-            if DEBUG_MODE: 
-                await show_boxes(img, boxes)
-            await websocket.send_json(jsonable_encoder(boxes))
+            await receive(websocket, queue)
         except WebSocketDisconnect:
+            detect_task.cancel()
             await websocket.close()
         
 @app.post("/test")
