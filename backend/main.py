@@ -7,9 +7,11 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from object_detector import ObjectDetector
+from text_detector import TextDetector
 from PIL import Image
 
 DEBUG_MODE = False
+MAX_REQUESTS = 3
 
 app = FastAPI()
 
@@ -27,6 +29,7 @@ app.add_middleware(
 )
 
 det : ObjectDetector = ObjectDetector("./models/yolov8n-oiv7.onnx")
+det_text : TextDetector = TextDetector(lang='en')
 
 async def show_boxes(frame, boxes : list[dict]) -> None:
     for i in boxes:
@@ -53,12 +56,15 @@ async def detectObjects(websocket : WebSocket, queue : asyncio.Queue) -> None:
         boxes = det.detect(img, img.shape[1], img.shape[0])
         if DEBUG_MODE: 
             await show_boxes(img, boxes)
-        await websocket.send_json(jsonable_encoder(boxes))
+        try:
+            await websocket.send_json(jsonable_encoder(boxes))
+        except WebSocketDisconnect:
+            pass
 
 @app.websocket("/detect")
 async def detect(websocket : WebSocket) -> None:
     await websocket.accept()
-    queue : asyncio.Queue = asyncio.Queue(maxsize=10)
+    queue : asyncio.Queue = asyncio.Queue(maxsize=MAX_REQUESTS)
     detect_task : asyncio.Task = asyncio.create_task(detectObjects(websocket=websocket, queue=queue)) 
     while True:
         try:
@@ -67,14 +73,11 @@ async def detect(websocket : WebSocket) -> None:
             detect_task.cancel()
             await websocket.close()
         
-@app.post("/test")
-async def test(request : Request) -> dict:
+@app.post("/detect_text")
+async def detect_text(request : Request) -> dict:
     byte_data = await request.body()
     byte_data = byte_data.decode('utf-8').split("base64,", 1)[1].encode('utf-8')
     data = base64.b64decode(byte_data)
-    img = cv2.cvtColor(np.array(Image.open(io.BytesIO(data))), cv2.COLOR_RGB2BGR)
-    boxes = det.detect(img, img.shape[1], img.shape[0])
-    cv2.imshow('test', img)
-    if cv2.waitKey(30) == 27 or not cv2.getWindowProperty('test', cv2.WND_PROP_VISIBLE):
-        cv2.destroyAllWindows()
-    return {"Boxes" : boxes}
+    img = np.array(Image.open(io.BytesIO(data)))
+    text = det_text.check_image(img)
+    return {"Text" : text}

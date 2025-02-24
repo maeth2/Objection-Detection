@@ -5,6 +5,7 @@ const RETRY_INTERVAL = 10000;
 const FPS = 60, FPS_DETECT = 5;
 var websocketConnected = false;
 var inputCanvas, inputContext, outputCanvas, outputContext;
+var webCamToggle = true;
 var ws, wsRetry;
 
 function init(){
@@ -17,22 +18,44 @@ function init(){
 }
 
 const webcam = document.createElement('video');
-const contraints = {
-    video : {
-        facingMode : 'enviroment'
+startWebCam(webcam)
+
+function startWebCam(webcam){
+    const contraints = {
+        video : {
+            facingMode : 'enviroment'
+        }
     }
+    navigator.mediaDevices.getUserMedia(contraints).then((stream) => {
+        webcam.srcObject = stream;
+        webcam.play();
+        setInterval(() =>{
+            inputContext.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
+            inputContext.drawImage(webcam, 0, 0, inputCanvas.width, inputCanvas.height);
+        }, 1000 / FPS);
+    }).catch((error) =>{
+        console.error(error);
+    });
 }
-navigator.mediaDevices.getUserMedia(contraints).then((stream) => {
-    webcam.srcObject = stream;
-    webcam.play();
-    setInterval(() =>{
-        inputContext.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
-        inputContext.drawImage(webcam, 0, 0, inputCanvas.width, inputCanvas.height);
-    }, 1000 / FPS);
-}).catch((error) =>{
-    console.error(error);
-});
-webcam.addEventListener('click', httpRequest);
+
+function stopWebCam(webcam){
+    webcam.srcObject.getTracks().forEach((track) => {track.stop()});
+}
+
+Array.from(document.getElementsByClassName("video")).forEach((button) => button.addEventListener('click', () => {
+    if(!webCamToggle){
+        startWebCam(webcam);
+        webCamToggle = true;
+    }else{
+        stopWebCam(webcam);
+        webCamToggle = false;
+    }
+    document.getElementById("video_on").style.display = webCamToggle ? 'block' : 'none';
+    document.getElementById("output").style.display = webCamToggle ? 'block' : 'none';
+    document.getElementById("video_off").style.display = !webCamToggle ? 'block' : 'none';
+}));
+
+document.getElementsByClassName("camera")[0].addEventListener('click', httpImgToText);
 
 function connectWS(){
     console.log("ATTEMPTING CONNECTION TO: ", WEBSOCKET_ADDRESS);
@@ -63,6 +86,7 @@ function connectWS(){
         console.log("CONNECTED TO: ", WEBSOCKET_ADDRESS);
     });
     ws.addEventListener('close', (event) => {
+        console.log("DISCONNECTED")
         websocketConnected = false
         outputContext.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
         wsRetry = setInterval(() => {
@@ -72,16 +96,16 @@ function connectWS(){
 }
 
 setInterval(() => {
-    if(websocketConnected){
+    if(websocketConnected && webCamToggle){
         if(SHOW_LOGS) console.log("Sending Web Socket Request...");
         inputCanvas.toBlob((blob) =>{ws.send(blob)}, 'image/png');
     }
 }, 1000 / FPS_DETECT);
 
-async function httpRequest(){
+async function httpImgToText(){
     inputContext.drawImage(webcam, 0, 0, inputCanvas.width, inputCanvas.height);
     const data = inputCanvas.toDataURL("image/jpeg", 1.0);
-    await fetch(URL="http://127.0.0.1:8000/test", {
+    await fetch(URL="http://127.0.0.1:8000/detect_text", {
         method : 'POST',
         body : data
     }).then((response) => {
