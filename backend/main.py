@@ -31,16 +31,6 @@ app.add_middleware(
 det : ObjectDetector = ObjectDetector("./models/yolov8n-oiv7.onnx")
 det_text : TextDetector = TextDetector(lang='en')
 
-async def show_boxes(frame, boxes : list[dict]) -> None:
-    for i in boxes:
-        bounds = i["bounds"]
-        cv2.putText(frame, text=i["label"], org=(bounds[2], bounds[3]), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=1, lineType=cv2.LINE_AA)
-        cv2.rectangle(frame, pt1=(bounds[0], bounds[1]), pt2=(bounds[2], bounds[3]), color=(255, 255, 255), thickness=1)
-    
-    cv2.imshow('test', frame)
-    if cv2.waitKey(10) == 27 or not cv2.getWindowProperty('test', cv2.WND_PROP_VISIBLE):
-                cv2.destroyAllWindows()
-
 async def receive(websocket : WebSocket, queue : asyncio.Queue) -> None:
     bytes = await websocket.receive_bytes()
     data = np.frombuffer(bytes, dtype=np.uint8)
@@ -53,31 +43,31 @@ async def receive(websocket : WebSocket, queue : asyncio.Queue) -> None:
 async def detectObjects(websocket : WebSocket, queue : asyncio.Queue) -> None:
     while True:
         img = await queue.get()
-        boxes = det.detect(img, img.shape[1], img.shape[0])
-        if DEBUG_MODE: 
-            await show_boxes(img, boxes)
+        boxes = det.detect(img, img.shape[1], img.shape[0], display=DEBUG_MODE)
         try:
             await websocket.send_json(jsonable_encoder(boxes))
         except WebSocketDisconnect:
             pass
-
+        except RuntimeError:
+            pass
+        
 @app.websocket("/detect")
 async def detect(websocket : WebSocket) -> None:
     await websocket.accept()
     queue : asyncio.Queue = asyncio.Queue(maxsize=MAX_REQUESTS)
     detect_task : asyncio.Task = asyncio.create_task(detectObjects(websocket=websocket, queue=queue)) 
-    while True:
-        try:
+    try:
+        while True:
             await receive(websocket, queue)
-        except WebSocketDisconnect:
-            detect_task.cancel()
-            await websocket.close()
+    except WebSocketDisconnect:
+        print("WEBSOCKET DISCONNECTED")
+        detect_task.cancel()
         
 @app.post("/detect_text")
 async def detect_text(request : Request) -> dict:
     byte_data = await request.body()
     byte_data = byte_data.decode('utf-8').split("base64,", 1)[1].encode('utf-8')
     data = base64.b64decode(byte_data)
-    img = np.array(Image.open(io.BytesIO(data)))
-    text = det_text.check_image(img)
-    return {"Text" : text}
+    img = np.array(Image.open(io.BytesIO(data)).convert('RGB'))
+    text = await det_text.check_image(img)
+    return {"text" : text}

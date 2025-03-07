@@ -19,7 +19,7 @@ def cv2_to_onnx(frame : cv2.typing.MatLike, size : tuple) -> np.ndarray:
     input = input.astype(np.float32)
     return input
 
-def parse_row(row : np.ndarray):
+def parse_row(row : np.ndarray) -> list:
     xc, yc, w, h = row[:4]
     prob = row[4:].max()
     class_id = row[4:].argmax()
