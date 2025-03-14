@@ -8,9 +8,8 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from object_detector import ObjectDetector
 from text_detector import TextDetector
-from PIL import Image
+from PIL import Image, ImageFilter
 
-DEBUG_MODE = False
 MAX_REQUESTS = 3
 
 app = FastAPI()
@@ -43,7 +42,7 @@ async def receive(websocket : WebSocket, queue : asyncio.Queue) -> None:
 async def detectObjects(websocket : WebSocket, queue : asyncio.Queue) -> None:
     while True:
         img = await queue.get()
-        boxes = det.detect(img, img.shape[1], img.shape[0], display=DEBUG_MODE)
+        boxes = det.detect(img, img.shape[1], img.shape[0])
         try:
             await websocket.send_json(jsonable_encoder(boxes))
         except WebSocketDisconnect:
@@ -69,5 +68,10 @@ async def detect_text(request : Request) -> dict:
     byte_data = byte_data.decode('utf-8').split("base64,", 1)[1].encode('utf-8')
     data = base64.b64decode(byte_data)
     img = np.array(Image.open(io.BytesIO(data)).convert('RGB'))
+    detect_img = np.array(Image.open(io.BytesIO(data)).convert('RGB'))[:, :, ::-1].copy()
+    detection = det.detect(detect_img, img.shape[1], img.shape[0], detect_color=True)
     text = await det_text.check_image(img)
-    return {"text" : text}
+    if not len(detection) == 0:
+        print("HELLO ", detection)
+        return {"text" : text, "detect" : jsonable_encoder(detection)} 
+    return {"text" : "No Objects Detected", "detect" : []}
