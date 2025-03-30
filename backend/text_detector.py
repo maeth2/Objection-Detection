@@ -3,10 +3,9 @@ import numpy as np
 import bounding_boxes
 from bounding_boxes import BoundingBox
 import cv2
-from PIL import Image
 
-DEBUG = True
-CONFIDENCE_THRESHOLD = 0.75
+DEBUG = False
+CONFIDENCE_THRESHOLD = 0.1
 class TextDetector():
     def __init__(self, lang : str):
         print("INITIALIZING TEXT DETECTOR")
@@ -40,9 +39,3 @@ class TextDetector():
                 cv2.destroyAllWindows()
 
         return output
-
-# txt = TextDetector('en')
-# file = "stop.png"
-# img = Image.open(f"./test images/{file}").convert('RGB')
-
-# text : list[BoundingBox] = txt.check_image(np.array(img))

@@ -1,5 +1,5 @@
 /backend/.venv/
-/backend/models/
 /CameraWebServer/credentials.h
 /frontend/tunnels.json
 /frontend/node_modules
+/backend/models

@@ -63,11 +63,11 @@ class BoundingBox():
         y_overlap = min(self.bounds[3], b.bounds[3]) - max(self.bounds[1], b.bounds[1])
         return x_overlap > -x_threshold and y_overlap > -y_threshold
     
-    def render(self, frame, label=True, box=True, color=(255, 255, 255), thickness=10, font_size=5, font_thickness = 5):
+    def render(self, frame, label=True, box=True, font_size=5):
         font_scale = font_size / 10
-        font_thickness = math.ceil(font_thickness / 10)
-        if label: cv2.putText(frame, text=self.label, org=(self.bounds[0], int(self.bounds[1] - font_size / 2)), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=font_scale, color=color, thickness=font_thickness, lineType=cv2.LINE_AA)
-        if box: cv2.rectangle(frame, pt1=(self.bounds[0], self.bounds[1]), pt2=(self.bounds[2], self.bounds[3]), color=color, thickness=thickness)
+        font_thickness = int(math.ceil(10 / 10))
+        if label: cv2.putText(frame, text=self.label, org=(self.bounds[0], int(self.bounds[1] - font_size / 2)), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=font_scale, color=self.color, thickness=font_thickness, lineType=cv2.LINE_AA)
+        if box: cv2.rectangle(frame, pt1=(self.bounds[0], self.bounds[1]), pt2=(self.bounds[2], self.bounds[3]), color=self.color, thickness=int(self.thickness))
 
     def __str__(self):
         return f"x: {self.x}, y: {self.y}, Bounds: {self.bounds}, Label: {self.label}"
