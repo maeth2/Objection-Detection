@@ -4,12 +4,17 @@ import cv2
 import io
 import numpy as np
 import time
+import torch
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from object_detector import ObjectDetector
 from text_detector import TextDetector
 from PIL import Image
+
+if(torch.cuda.is_available()):
+    print("CUDA AVAILABLE: INITIALIZING GPU")
+    torch.cuda.set_device(0)
 
 MAX_REQUESTS = 5 #Maximum Request Queue Size
 
@@ -25,7 +30,7 @@ app.add_middleware(
 )
 
 #Start Object and Text Detection
-det : ObjectDetector = ObjectDetector("yolov8n-oiv7")
+det : ObjectDetector = ObjectDetector("yolov8x-oiv7")
 det_text : TextDetector = TextDetector(lang='en')
 
 ''' 
@@ -97,7 +102,7 @@ async def detect_text(request : Request) -> dict:
     data = base64.b64decode(byte_data)
     img = np.array(Image.open(io.BytesIO(data)).convert('RGB'))
     detect_img = np.array(Image.open(io.BytesIO(data)).convert('RGB'))[:, :, ::-1].copy()
-    detection = det.detect(detect_img, detect_color=True)
+    detection = det.detect(detect_img, detect_color=False)
     text = await det_text.check_image(img)
     if not len(detection) == 0:
         return {"text" : text, "detect" : jsonable_encoder(detection)} 
