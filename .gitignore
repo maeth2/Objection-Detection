@@ -1,5 +1,6 @@
-/backend/.venv/
 /CameraWebServer/credentials.h
 /frontend/tunnels.json
 /frontend/node_modules
 /backend/models
+/backend/__pycache__
+/backend/.venv/
