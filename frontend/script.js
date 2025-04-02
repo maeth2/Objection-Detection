@@ -2,11 +2,11 @@ document.body.onload = function(){init()}
 
 const DEBUG = false;
 const DETECTION_ADDRESS = '8000';
-const CAMERA_WEBSOCKET_ADDRESS = 'ws://172.20.10.9:80/ws'
+const CAMERA_ADDRESS = '172.20.10.9:80'
 const RETRY_INTERVAL = 1000;
 const LABEL_RESOLUTION = 2;
 const WEBCAM = true;
-const FPS = 60, FPS_DETECT = 1;
+const FPS = 60, FPS_DETECT = 10;
 
 var addresses = {}
 
@@ -85,9 +85,9 @@ function stopWebCam(webcam){
 }
 
 function connectDetectionWS(){
-    var detection_websocket_address = "wss://" + addresses[DETECTION_ADDRESS] + "/detect";
-    console.log("ATTEMPTING CONNECTION TO: ", detection_websocket_address);
-    wsDetect = new WebSocket(detection_websocket_address);
+    var address = "wss://" + addresses[DETECTION_ADDRESS] + "/detect";
+    console.log("ATTEMPTING CONNECTION TO: ", address);
+    wsDetect = new WebSocket(address);
     clearInterval(wsDetectRetry);
     wsDetect.addEventListener('message', (event) => {
         outputContext.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
@@ -112,24 +112,25 @@ function connectDetectionWS(){
     });
     wsDetect.addEventListener('open', (event) => {
         detectWebsocketConnected = true;
-        console.log("CONNECTED TO: ", detection_websocket_address);
+        console.log("CONNECTED TO: ", address);
     });
     wsDetect.addEventListener('close', (event) => {
-        console.log("DISCONNECTED FROM: ", detection_websocket_address);
+        console.log("DISCONNECTED FROM: ", address);
         detectWebsocketConnected = false;
         outputContext.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
         clearInterval(wsDetectRetry);
         wsDetectRetry = setInterval(() => {
-            console.log("RETRYING CONNECTION TO: ", detection_websocket_address);
+            console.log("RETRYING CONNECTION TO: ", address);
             connectDetectionWS();
         }, RETRY_INTERVAL);
     });
 }
 
 function connectCameraWS(){
-    console.log("ATTEMPTING CONNECTION TO: ", CAMERA_WEBSOCKET_ADDRESS);
-    wsCamera = new WebSocket(CAMERA_WEBSOCKET_ADDRESS);
-    console.log("SUCESSFULLY CONNECTED TO: ", CAMERA_WEBSOCKET_ADDRESS);
+    var address = "wss://" + addresses[CAMERA_ADDRESS] + "/ws";
+    console.log("ATTEMPTING CONNECTION TO: ", address);
+    wsCamera = new WebSocket(address);
+    console.log("SUCESSFULLY CONNECTED TO: ", address);
     clearInterval(wsCameraRetry);
 
     wsCamera.addEventListener('message', (event) => {
@@ -145,13 +146,13 @@ function connectCameraWS(){
         }
     });
     wsCamera.addEventListener('open', (event) => {
-        console.log("CONNECTED TO: ", CAMERA_WEBSOCKET_ADDRESS);
+        console.log("CONNECTED TO: ", address);
     });
     wsCamera.addEventListener('close', (event) => {
-        console.log("DISCONNECTED FROM: ", CAMERA_WEBSOCKET_ADDRESS);
+        console.log("DISCONNECTED FROM: ", address);
         clearInterval(wsCameraRetry);
         wsCameraRetry = setInterval(() => {
-            console.log("RETRYING CONNECTION TO: ", CAMERA_WEBSOCKET_ADDRESS);
+            console.log("RETRYING CONNECTION TO: ", address);
             connectCameraWS();
         }, RETRY_INTERVAL);
     });
