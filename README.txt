@@ -8,7 +8,6 @@ TO RUN:
     Follow Link to Public URL for localhost:8080
 
 TO RUN MANUALLY(Type in CMD):
-    Install Packages -> pip install -r requirements.txt
     Start Backend Local Host -> uvicorn main:app --reload
     Start Frontend Local Host -> http-server
 
