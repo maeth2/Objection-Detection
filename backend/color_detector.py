@@ -1,9 +1,9 @@
 import cv2
-# from object_detector import ObjectDetector
 import numpy as np
 
 DEBUG = False
 
+##Color HSV range
 hsv_colors = [
     ["red", 0, 16],
     ["orange", 17, 50], 
@@ -15,20 +15,34 @@ hsv_colors = [
     ["red", 336, 359] 
 ]
 
+##Shade HSV range
 hsv_shades = [
     ["black", 0, 40],
     ["white", 41, 100] 
 ]
 
 class ColorDetector:
+
+    '''
+    Main Color Detection Function
+
+    @param img          CV2 Image
+    @param tl           Top Left Coordinate of Object
+    @param tr           Top Right Coordinate of Object
+
+    @return             Object Color
+    '''
     def detect(self, img : cv2.typing.MatLike, tl, br) -> str:
+        ##Crop image
         obj = img[tl[1] : br[1], tl[0] : br[0]]
         hsv = cv2.cvtColor(obj, cv2.COLOR_BGR2HSV)
-
+        
+        ##Create color masks
         mx = -1
         mx_color = ""
         mx_mask = ""
         
+        ##Detect max color masks
         for i in hsv_colors:
             mask = cv2.inRange(hsv, np.array([i[1] / 2, 50, 0]), np.array([i[2] / 2, 255, 255]))
             percent = (mask > 0).mean() * 100
@@ -37,6 +51,7 @@ class ColorDetector:
                 mx_color = i[0]
                 mx_mask = mask
 
+        ##Detect max shades, white -> black
         for i in hsv_shades:
             mask = cv2.inRange(hsv, np.array([0, 0, i[1]]), np.array([179, 49, i[2]]))
             percent = (mask > 0).mean() * 100
@@ -44,7 +59,8 @@ class ColorDetector:
                 mx = percent
                 mx_color = i[0]
                 mx_mask = mask
-        
+                
+        ##Debug -> Show max color mask
         if DEBUG:
             cv2.imshow('test', mx_mask)
             if cv2.waitKey(0) == 27 or not cv2.getWindowProperty('test', cv2.WND_PROP_VISIBLE):
