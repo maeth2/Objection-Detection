@@ -2,18 +2,20 @@ document.body.onload = function(){init()}
 
 const DEBUG = false;
 const DETECTION_ADDRESS = '8000';
-const CAMERA_ADDRESS = '172.20.10.9:80'
+const CAMERA_ADDRESS = 'http://172.20.10.9:80'
 const RETRY_INTERVAL = 1000;
 const LABEL_RESOLUTION = 2;
-const WEBCAM = true;
-const FPS = 60, FPS_DETECT = 10;
+const FPS = 60, FPS_DETECT = 3;
 
+var externalWebCam = true;
+var internalWebCam = false;
 var addresses = {}
 
-var detectWebsocketConnected = false;
 var inputCanvas, inputContext, outputCanvas, outputContext, labelCanvas, labelContext;
-var webCamToggle = true;
 var wsDetect, wsDetectRetry, wsCamera, wsCameraRetry;
+var onMobileDevice = false;
+var detectWebsocketConnected = false;
+var webCamDirection = 'user';
 var outputText;
 var storedURL;
 var utterance;
@@ -45,17 +47,29 @@ async function init(){
     outputText = document.getElementById("detect");
     utterance = new SpeechSynthesisUtterance();
     utterance.text = "NOTHING DETECTED";
+    checkMobileDevice();
     connectDetectionWS();
     connectCameraWS();
+}
+
+function checkMobileDevice(){
+    onMobileDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if(onMobileDevice){
+        document.getElementsByClassName("output-container")[0].style.display = 'none';
+        document.getElementsByClassName("video-button-container")[0].style.width = '90%'
+        document.getElementsByClassName("video-button-container")[0].style.height = '70%'
+        document.getElementById('flip').style.display = 'block'
+    }
 }
 
 const webcam = document.createElement('video');
 startWebCam(webcam)
 
 function startWebCam(webcam){
+    console.log("internalWebCam STARTED");
     const contraints = {
         video : {
-            facingMode: "user"
+            facingMode: webCamDirection
         },
         audio : false
     }
@@ -70,7 +84,7 @@ function startWebCam(webcam){
         webcam.setAttribute('playsinline', '');
         webcam.play();
         setInterval(() =>{
-            if(WEBCAM){
+            if(!externalWebCam || internalWebCam){
                 inputContext.clearRect(0, 0, inputCanvas.width, inputCanvas.height);
                 inputContext.drawImage(webcam, 0, 0, inputCanvas.width, inputCanvas.height);
             }
@@ -82,6 +96,11 @@ function startWebCam(webcam){
 
 function stopWebCam(webcam){
     webcam.srcObject.getTracks().forEach((track) => {track.stop()});
+}
+
+function flipWebCam(webcam){
+    webCamDirection = webCamDirection == 'user' ? 'enviroment' : 'user';
+    startWebCam(webcam);
 }
 
 function connectDetectionWS(){
@@ -126,6 +145,14 @@ function connectDetectionWS(){
     });
 }
 
+function setCameraTimeout(time){
+    var timeout = setTimeout(() => {
+        console.log("TIMED OUT. REVERTING BACK TO BUILT IN CAMERA.")
+        externalWebCam = false;
+    }, time);
+    return timeout;
+}
+
 function connectCameraWS(){
     var address = "wss://" + addresses[CAMERA_ADDRESS] + "/ws";
     console.log("ATTEMPTING CONNECTION TO: ", address);
@@ -133,8 +160,13 @@ function connectCameraWS(){
     console.log("SUCESSFULLY CONNECTED TO: ", address);
     clearInterval(wsCameraRetry);
 
+    var timeout = setCameraTimeout(2000);
+
     wsCamera.addEventListener('message', (event) => {
-        if (!WEBCAM){
+        clearInterval(timeout);
+        timeout = setCameraTimeout(2000);
+        externalWebCam = true;
+        if (externalWebCam && !internalWebCam){
             URL.revokeObjectURL(storedURL);
             var img = new Image();
             img.onload = function() {
@@ -159,7 +191,7 @@ function connectCameraWS(){
 }
 
 async function httpImgToText(){
-    // if(!WEBCAM){
+    // if(!internalWebCam){
     //     console.log("FETCHING CAMERA IMAGE");
     //     const response = await fetch(CAMERA_WEBSERVER_CAPTURE_ADDRESS, {
     //         method : 'GET'
@@ -203,7 +235,7 @@ async function speak(text){
 
 //UPDATE DISPLAY EACH FRAME
 setInterval(() => {
-    if(detectWebsocketConnected && webCamToggle){
+    if(detectWebsocketConnected){
         if(DEBUG) console.log("Sending Web Socket Request...");
         inputCanvas.toBlob((blob) =>{wsDetect.send(blob)}, 'image/png');
     }
@@ -211,17 +243,11 @@ setInterval(() => {
 
 //TURNING OFF AND ON WEBCAM
 Array.from(document.getElementsByClassName("video")).forEach((button) => button.addEventListener('click', () => {
-    if(!webCamToggle){
-        startWebCam(webcam);
-        webCamToggle = true;
-    }else{
-        stopWebCam(webcam);
-        webCamToggle = false;
-    }
-    document.getElementById("video_on").style.display = webCamToggle ? 'block' : 'none';
-    document.getElementById("video_off").style.display = !webCamToggle ? 'block' : 'none';
-    document.getElementById("output").style.display = webCamToggle ? 'block' : 'none';
+    document.getElementById("video_on").style.display = !internalWebCam ? 'block' : 'none';
+    document.getElementById("video_off").style.display = internalWebCam ? 'block' : 'none';
+    internalWebCam = !internalWebCam;
 }));
 
 document.getElementById("camera").addEventListener('click', httpImgToText);
 document.getElementById("sound").addEventListener('click', ()=>{speak(null)});
+document.getElementById("flip").addEventListener('click', ()=>{flipWebCam(webcam)});
